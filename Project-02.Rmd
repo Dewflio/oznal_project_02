@@ -1,0 +1,276 @@
+# OZNAL - Project 02 - More classification and regression models
+
+## FIIT STU - Bratislava
+
+## April 2024
+
+## Authors
+
+-   Leonard Puškáč
+-   Ema Richnáková
+
+## Dataset
+
+In this mini-project we will analyse data from <https://www.kaggle.com/datasets/julianoorlandi/spotify-top-songs-and-audio-features?resource=download>
+
+The dataset contains information about various "top" songs and their stats on Spotify.
+There are 6513 entries each containing FILL IN features, such as the name of the song, its id, features that can be used to classify the songs such as the key or the mode (Major/Minor), as well as numeric features that can be used for regression analysis - energy, danceability, speechiness (the amount of spoken word), liveness, loudness, tempo and many others.
+
+### Data Description
+
+| Column name      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|------------------------------------|------------------------------------|
+| id               | The Spotify ID for the track.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| artist_names     | The name of the artist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| track_name       | The name of the track.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| source           | The name of the record label.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| key              | The key the track is in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| mode             | Mode indicates the modality (major or minor) of a track, the type of scale from which its melodic content is derived.                                                                                                                                                                                                                                                                                                                                                                                              |
+| time_signature   | An estimated time signature. The time signature (meter) is a notational convention to specify how many beats are in each bar (or measure). The time signature ranges from 3 to 7.                                                                                                                                                                                                                                                                                                                                  |
+| danceability     | Danceability describes how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity. A value of 0.0 is least danceable and 1.0 is most danceable.                                                                                                                                                                                                                                                                       |
+| energy           | Energy is a measure from 0.0 to 1.0 and represents a perceptual measure of intensity and activity. Typically, energetic tracks feel fast, loud, and noisy. For example, death metal has high energy, while a Bach prelude scores low on the scale. Perceptual features contributing to this attribute include dynamic range, perceived loudness, timbre, onset rate, and general entropy.                                                                                                                          |
+| speechiness      | Speechiness detects the presence of spoken words in a track. The more exclusively speech-like the recording (e.g. talk show, audio book, poetry), the closer to 1.0 the attribute value. Values above 0.66 describe tracks that are probably made entirely of spoken words. Values between 0.33 and 0.66 describe tracks that may contain both music and speech, either in sections or layered, including such cases as rap music. Values below 0.33 most likely represent music and other non-speech-like tracks. |
+| acousticness     | A confidence measure from 0.0 to 1.0 of whether the track is acoustic. 1.0 represents high confidence the track is acoustic.                                                                                                                                                                                                                                                                                                                                                                                       |
+| instrumentalness | Predicts whether a track contains no vocals. "Ooh" and "aah" sounds are treated as instrumental in this context. Rap or spoken word tracks are clearly "vocal". The closer the instrumentalness value is to 1.0, the greater likelihood the track contains no vocal content. Values above 0.5 are intended to represent instrumental tracks, but confidence is higher as the value approaches 1.0.                                                                                                                 |
+| liveness         | Detects the presence of an audience in the recording. Higher liveness values represent an increased probability that the track was performed live. A value above 0.8 provides strong likelihood that the track is live.                                                                                                                                                                                                                                                                                            |
+| valence          | A measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track. Tracks with high valence sound more positive (e.g. happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g. sad, depressed, angry).                                                                                                                                                                                                                                                                  |
+| loudness         | The overall loudness of a track in decibels (dB). Loudness values are averaged across the entire track and are useful for comparing relative loudness of tracks. Loudness is the quality of a sound that is the primary psychological correlate of physical strength (amplitude). Values typically range between -60 and 0 db.                                                                                                                                                                                     |
+| tempo            | The overall estimated tempo of a track in beats per minute (BPM). In musical terminology, tempo is the speed or pace of a given piece and derives directly from the average beat duration.                                                                                                                                                                                                                                                                                                                         |
+| duration_ms      | The duration of the track in milliseconds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| weeks_on_chart   | Number of weeks the track was in the top 200 charts.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| streams          | How many streams the track had during its period in the charts.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+## Importing Libraries
+
+```{r message=FALSE}
+library(magrittr)
+library(tidyverse)
+library(dplyr) # mutate
+library(e1071) # SVM
+library(pROC) # create ROC curve roc()
+library(caret) # confusion matrix
+```
+
+## Loading the Dataset
+
+```{r}
+data <- read_csv("spotify_top_songs_audio_features.csv", col_names = TRUE, num_threads = 4)
+head(data)
+```
+
+## Data exploration
+
+### Correlation analysis
+
+From contructed correlation heatmap below, we can see e.g. strong positive correlation between energy and loudness and valence.
+From this information, hypotheses can be created.
+
+```{r}
+heatmap(cor(data %>% select_if(is.numeric)),
+        col = colorRampPalette(c("darkgreen", "white", "red"))(100),
+        symm = TRUE)
+```
+
+#### Hypothesis 1
+
+*Songs classified as more energetic (>=0.64)(1) are more likely to be louder and happier compared to songs classified as less energetic (<0.64)(class 0).*
+
+Using energy mean as threshold for classification is beneficial for top Spotify songs dataset, where higher energy levels are prevalent.
+Classification classes will be more balanced.
+
+```{r}
+mean_energy <- mean(data$energy)
+mean_energy
+
+data1 <- data %>%
+  mutate(energy = ifelse(energy >= mean_energy, 1, 0)) %>%
+  select_if(is.numeric)
+head(data1)
+
+table(data1$energy)
+```
+
+## Classification model - Support Vector Machine (SVM)
+
+### Why SVM?
+
+SVM preforms well in high-dimensional spaces, making it suitable for dataset with many features.
+Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting).
+Performs well by focusing on the most informative features.
+It can also handle inbalanced datasets, but our classification solves this issue already.
+
+### Prepare data for SVM
+
+SVM model does not require normally distributed data.
+However, it is crucial to properly scale input data.
+Scale of song features can influence decision boudnaries of SVM, thereby affecting its optimal performance.
+
+Common practice is to scale input to similar range (e.g. 0-1) before training.
+
+Valence values are already normalized, but we scale it also with loudness, so both have $min=0$ and $max=1$.
+
+```{r}
+hist(data1$loudness + data1$valence, col = "green") # hypergeometric distribution of data
+
+range(data1$loudness)
+range(data1$valence)
+```
+
+#### Scaling
+
+```{r}
+min_max_scale <- function(x, min_val, max_val) {
+  (x - min_val) / (max_val - min_val)
+}
+
+data1 <- data1 %>%
+  mutate(
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    valence = min_max_scale(valence, min(valence), max(valence))
+  )
+
+# New range of loudness:
+range(data1$loudness)
+# New range of valence:
+range(data1$valence)
+```
+
+### Sampling
+
+```{r}
+sample <- sample(c(TRUE, FALSE), nrow(data1), replace = TRUE, prob = c(0.7, 0.3))
+train_data <- data1[sample, ]
+test_data <- data1[!sample, ]
+```
+
+### Train SVM model
+
+Model attributes:
+
+- **kernel** = "linear" → for binary classification
+- **cost** - higher → more complex decision boundary → penalizes misclassification
+- **scale** = FALSE → inputs are already scaled, so scalling in SVM can be disabled
+
+```{r}
+model_svm <- svm(as.factor(energy) ~ loudness + valence, data = train_data, kernel = "linear", cost = 10, scale = FALSE)
+```
+
+Support vectors are data points that lies closest to decision boundary and influence placement of decision boundary.
+
+```{r}
+summary(model_svm)
+```
+
+Coefficients represents weight of each feature to predict true positive/negative.
+(Intercept) determines the position of decision boundary. 
+
+- positive coef. → higher chance of class 1
+- negative coef. → opposite
+
+Positive coeficients supports our **Hypothessis 1**.
+
+**So we are not rejecting hypothesis, that louder and hapier songs are more energetic.**
+
+```{r}
+coefs <- coef(model_svm) ; coefs
+
+plot(model_svm, train_data, loudness ~ valence, col = c("#ffc0c9", "lightgrey"))
+# ablines from https://www.datacamp.com/tutorial/support-vector-machines-r
+abline(-coefs[1] / coefs[2], (-coefs[3] / coefs[2]), col = "green")
+abline((-coefs[1] - 1) / coefs[2], -coefs[3] / coefs[2], lty = 2, col = "green")
+abline((-coefs[1] + 1) / coefs[2], -coefs[3] / coefs[2], lty = 2, col = "green")
+```
+
+If the decision boundary is nearly horizontal/vertical, it indicates high correlation among the data in the formula, supporting our initial assumption from correlation analysis.
+
+### Test SVM model
+
+Decision values are signed distance of each data point to the decision boundary. 
+It represents confidence of the model in its prediction.
+
+```{r}
+predicted_classes <- predict(model_svm, newdata = test_data, decision.values = TRUE)
+
+decision_values <- attr(predicted_classes, "decision.values")[, 1]
+head(decision_values)
+```
+
+#### ROC curve
+
+ROC curve is graphical representation of performance of binasry classifier. 
+
+```{r}
+roc <- roc(test_data$energy, decision_values)
+plot(roc, main = "ROC Curve for SVM Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(roc), 5)), col = "green", lwd = 2, bty = "n")
+```
+
+#### Evaluation of SVM
+
+```{r}
+confusion_matrix <- caret::confusionMatrix(as.factor(predicted_classes), as_factor(test_data$energy), positive = "1")
+ct <- confusion_matrix$table
+
+TP <- ct[2, 2] # true positive
+FP <- ct[2, 1] # false positive
+TN <- ct[1, 1] # true negative
+FN <- ct[1, 2] # false negative
+P <- TP + FN # all positives (1)
+N <- FP + TN # all negatives (0)
+
+# confusion matrix heatmap
+ggplot(as.data.frame(ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+**Accuracy** indicates overall model performance. Higher accuracy suggests better predictive performance, but it may not provide complete picture, especially in imbalanced datasets.
+
+```{r}
+print(paste("Accuracy: ", (TP + TN) / (P + N)))
+```
+
+But in our case, dataset is balanced, because classification classes are divided nearly 50/50. So our model has good performance.
+
+```{r}
+print(paste("Proportion of class 1: ", P / (P + N)))
+print(paste("Proportion of class 0: ", N / (P + N)))
+```
+
+**Precision** measures ability of model to avoid FP. Higher precision indicates fewer FP, meaning fewer instances are incorrectly predicted as *class 1*.
+
+```{r}
+precision <- TP / (FP + TP)
+print(paste("Precision: ", precision))
+```
+
+**Recall** measures ability of model to capture all actual positives. Higher recall indicates that model captures higher proportion of actual *class 1* instances.
+
+```{r}
+recall <- TP / P
+print(paste("Recall: ", recall))
+```
+
+**F1-score** provides balanced measure between precision and recall. It is useful when there is an uneven class distribution (in our case it is even).
+
+```{r}
+f1_score <- 2 * (precision * recall) / (precision + recall)
+print(paste("F1 score: ", f1_score))
+```
+
+**Specificity** measures how well model performs in correct identified instances of the negative class. High specificity indicates that model has low FP rate, meaning it effectively identifies TN without misclassifying them as positives.
+
+```{r}
+print(paste("Specificity: ", TN / (TN + FP)))
+```
+
+
+## LEO model - ?
+
+## LEO model - ?
+
+## Summary
+
+! Importnat !
