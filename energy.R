@@ -157,10 +157,9 @@ GBM_data <- GBM_data %>%
     valence = min_max_scale(valence, min(valence), max(valence))
   )
 
-range(GBM_data$energy)
 range(GBM_data$valence)
 range(GBM_data$loudness)
-range(GBM_data$energy)
+
 
 
 set.seed(1)
@@ -223,10 +222,11 @@ gbm_tuned <- train(
   method = "gbm", 
   trControl = ctrl, 
   tuneGrid = param_grid,
+  distribution="bernoulli",
 )
 
 GBM_tuned_model <- gbm_tuned$finalModel
-View(GBM_tuned_model)
+str(GBM_tuned_model)
 
 GBM_tuned_prediction_probabilities <- predict(GBM_tuned_model, newdata = GBM_test_data, type = "response")
 head(GBM_tuned_prediction_probabilities)

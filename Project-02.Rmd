@@ -18,7 +18,7 @@ The dataset contains information about various "top" songs and their stats on Sp
 ### Data Description
 
 | Column name      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-|------------------------------------|------------------------------------|
+|-----------|-------------------------------------------------------------|
 | id               | The Spotify ID for the track.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | artist_names     | The name of the artist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | track_name       | The name of the track.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -48,6 +48,10 @@ library(dplyr) # mutate
 library(e1071) # SVM
 library(pROC) # create ROC curve roc()
 library(caret) # confusion matrix
+library(randomForest)
+library(MASS)
+library(gbm)
+library(pROC)
 ```
 
 ## Loading the Dataset
@@ -92,11 +96,7 @@ table(data1$energy)
 
 ### Why SVM?
 
-SVM preforms well in high-dimensional spaces, making it suitable for dataset with many features.
-Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting).
-Performs well by focusing on the most informative features.
-It can also handle inbalanced datasets, but our classification solves this issue already.
-And our classification is binary, so linear kernel of SVM is suitable for our case. 
+SVM preforms well in high-dimensional spaces, making it suitable for dataset with many features. Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting). Performs well by focusing on the most informative features. It can also handle inbalanced datasets, but our classification solves this issue already. And our classification is binary, so linear kernel of SVM is suitable for our case.
 
 ### Prepare data for SVM
 
@@ -163,8 +163,7 @@ Coefficients represents weight of each feature to predict true positive/negative
 -   positive coef. → higher chance of class 1
 -   negative coef. → opposite
 
-Higher coeficient of *loudness* feature supports our **Hypothessis 1**, which has high impact on evaluation that song is more energetic.
-But *valence* also take a little role there.
+Higher coeficient of *loudness* feature supports our **Hypothessis 1**, which has high impact on evaluation that song is more energetic. But *valence* also take a little role there.
 
 **So we are not rejecting hypothesis, that louder and hapier songs are more energetic.**
 
@@ -180,9 +179,7 @@ abline((-coefs[1] + 1) / coefs[2], -coefs[3] / coefs[2], lty = 2, col = "green")
 
 If the decision boundary is nearly horizontal/vertical, it indicates high correlation among the data in the formula, supporting our initial assumption from correlation analysis.
 
-Margin (dashed line) is defined as distance between decision boundary and the closest support vector(s).
-SVM aims to maximize this margin during training.
-Larger margin indicates better separation between classes and typically leads to better generalization performance.
+Margin (dashed line) is defined as distance between decision boundary and the closest support vector(s). SVM aims to maximize this margin during training. Larger margin indicates better separation between classes and typically leads to better generalization performance.
 
 ### Test SVM model
 
@@ -197,7 +194,7 @@ head(decision_values)
 
 #### ROC curve
 
-ROC curve is graphical representation of performance of binary classifier. 
+ROC curve is graphical representation of performance of binary classifier.
 
 ```{r message=FALSE}
 roc <- roc(test_data$energy, decision_values)
@@ -743,7 +740,7 @@ head(GBM_prediction_probabilities)
 
 
 GBM_roc <- roc(GBM_test_data$energy, GBM_prediction_probabilities)
-plot(GBM_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+plot(GBM_roc, main = "ROC Curve for GBM Model", col = "green", lwd = 2)
 legend("bottomright", legend = paste("AUC =", round(auc(GBM_roc), 5)), col = "green", lwd = 2, bty = "n")
 
 GBM_predictions <- ifelse(GBM_prediction_probabilities >= 0.8576, 1, 0)
@@ -773,7 +770,7 @@ ggplot(as.data.frame(GBM_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
 
 ### Tuning Hyper parameters
 
-```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
 # Define the parameter grid
 param_grid <- expand.grid(
   n.trees = c(100, 200, 300),
@@ -795,7 +792,7 @@ garbage <- capture.output(gbm_tuned <- train(
 ))
 
 GBM_tuned_model <- gbm_tuned$finalModel
-View(GBM_tuned_model)
+#View(GBM_tuned_model)
 ```
 
 ### Tuned GBM results
