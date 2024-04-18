@@ -13,8 +13,7 @@
 
 In this mini-project we will analyse data from <https://www.kaggle.com/datasets/julianoorlandi/spotify-top-songs-and-audio-features?resource=download>
 
-The dataset contains information about various "top" songs and their stats on Spotify.
-There are 6513 entries each containing FILL IN features, such as the name of the song, its id, features that can be used to classify the songs such as the key or the mode (Major/Minor), as well as numeric features that can be used for regression analysis - energy, danceability, speechiness (the amount of spoken word), liveness, loudness, tempo and many others.
+The dataset contains information about various "top" songs and their stats on Spotify. There are 6513 entries each containing FILL IN features, such as the name of the song, its id, features that can be used to classify the songs such as the key or the mode (Major/Minor), as well as numeric features that can be used for regression analysis - energy, danceability, speechiness (the amount of spoken word), liveness, loudness, tempo and many others.
 
 ### Data Description
 
@@ -62,8 +61,7 @@ head(data)
 
 ### Correlation analysis
 
-From contructed correlation heatmap below, we can see e.g. strong positive correlation between energy and loudness and valence.
-From this information, hypotheses can be created.
+From contructed correlation heatmap below, we can see e.g. strong positive correlation between energy and loudness and valence. From this information, hypotheses can be created.
 
 ```{r}
 heatmap(cor(data %>% select_if(is.numeric)),
@@ -73,10 +71,9 @@ heatmap(cor(data %>% select_if(is.numeric)),
 
 #### Hypothesis 1
 
-*Songs classified as more energetic (>=0.64)(1) are more likely to be louder and happier compared to songs classified as less energetic (<0.64)(class 0).*
+*Songs classified as more energetic (\>=0.64)(1) are more likely to be louder and happier compared to songs classified as less energetic (\<0.64)(class 0).*
 
-Using energy mean as threshold for classification is beneficial for top Spotify songs dataset, where higher energy levels are prevalent.
-Classification classes will be more balanced.
+Using energy mean as threshold for classification is beneficial for top Spotify songs dataset, where higher energy levels are prevalent. Classification classes will be more balanced.
 
 ```{r}
 mean_energy <- mean(data$energy)
@@ -94,16 +91,11 @@ table(data1$energy)
 
 ### Why SVM?
 
-SVM preforms well in high-dimensional spaces, making it suitable for dataset with many features.
-Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting).
-Performs well by focusing on the most informative features.
-It can also handle inbalanced datasets, but our classification solves this issue already.
+SVM preforms well in high-dimensional spaces, making it suitable for dataset with many features. Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting). Performs well by focusing on the most informative features. It can also handle inbalanced datasets, but our classification solves this issue already.
 
 ### Prepare data for SVM
 
-SVM model does not require normally distributed data.
-However, it is crucial to properly scale input data.
-Scale of song features can influence decision boudnaries of SVM, thereby affecting its optimal performance.
+SVM model does not require normally distributed data. However, it is crucial to properly scale input data. Scale of song features can influence decision boudnaries of SVM, thereby affecting its optimal performance.
 
 Common practice is to scale input to similar range (e.g. 0-1) before training.
 
@@ -147,9 +139,9 @@ test_data <- data1[!sample, ]
 
 Model attributes:
 
-- **kernel** = "linear" → for binary classification
-- **cost** - higher → more complex decision boundary → penalizes misclassification
-- **scale** = FALSE → inputs are already scaled, so scalling in SVM can be disabled
+-   **kernel** = "linear" → for binary classification
+-   **cost** - higher → more complex decision boundary → penalizes misclassification
+-   **scale** = FALSE → inputs are already scaled, so scalling in SVM can be disabled
 
 ```{r}
 model_svm <- svm(as.factor(energy) ~ loudness + valence, data = train_data, kernel = "linear", cost = 10, scale = FALSE)
@@ -161,11 +153,10 @@ Support vectors are data points that lies closest to decision boundary and influ
 summary(model_svm)
 ```
 
-Coefficients represents weight of each feature to predict true positive/negative.
-(Intercept) determines the position of decision boundary. 
+Coefficients represents weight of each feature to predict true positive/negative. (Intercept) determines the position of decision boundary.
 
-- positive coef. → higher chance of class 1
-- negative coef. → opposite
+-   positive coef. → higher chance of class 1
+-   negative coef. → opposite
 
 Positive coeficients supports our **Hypothessis 1**.
 
@@ -185,8 +176,7 @@ If the decision boundary is nearly horizontal/vertical, it indicates high correl
 
 ### Test SVM model
 
-Decision values are signed distance of each data point to the decision boundary. 
-It represents confidence of the model in its prediction.
+Decision values are signed distance of each data point to the decision boundary. It represents confidence of the model in its prediction.
 
 ```{r}
 predicted_classes <- predict(model_svm, newdata = test_data, decision.values = TRUE)
@@ -197,7 +187,7 @@ head(decision_values)
 
 #### ROC curve
 
-ROC curve is graphical representation of performance of binasry classifier. 
+ROC curve is graphical representation of performance of binasry classifier.
 
 ```{r}
 roc <- roc(test_data$energy, decision_values)
@@ -266,11 +256,581 @@ print(paste("F1 score: ", f1_score))
 print(paste("Specificity: ", TN / (TN + FP)))
 ```
 
+## Regression models
 
-## LEO model - ?
+### randomForest: acousticness \~ loudness + energy + valence
 
-## LEO model - ?
+```{r}
+randomForest_data <- data[, c("acousticness", "loudness", "energy", "danceability")]
+randomForest_data <- randomForest_data %>%
+  mutate(
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    energy = min_max_scale(energy, min(energy), max(energy)),
+    danceability = min_max_scale(danceability, min(danceability), max(danceability))
+  )
+
+mean(randomForest_data$acousticness)
+median(randomForest_data$acousticness)
+range(randomForest_data$acousticness)
+range(randomForest_data$danceability)
+range(randomForest_data$loudness)
+range(randomForest_data$energy)
+
+
+set.seed(1)
+randomForest_train_indices <- createDataPartition(randomForest_data$acousticness, p = 0.8, list = FALSE)
+randomForest_train_data <- randomForest_data[randomForest_train_indices, ]
+randomForest_test_data <- randomForest_data[-randomForest_train_indices, ]
+
+```
+
+```{r}
+randomForest_model <- randomForest(acousticness ~ ., data = randomForest_train_data, ntree=500)
+summary(randomForest_model)
+
+randomForest_predictions <- predict(randomForest_model, newdata = randomForest_test_data)
+randomForest_mse <- mean((randomForest_test_data$acousticness - randomForest_predictions)^2)
+randomForest_mse
+
+varImpPlot(randomForest_model)
+
+randomForest_residuals <- randomForest_test_data$acousticness - randomForest_predictions
+plot(randomForest_predictions, randomForest_residuals, xlab = "Predicted", ylab = "Residuals", main = "Residual Plot")
+
+```
+
+### randomForest: energy \~ loudness + valence
+
+```{r}
+hist(data$energy, col="green")
+
+model2_data <- data[, c("energy", "loudness", "valence")]
+model2_data <- model2_data %>%
+  mutate(
+    #energy = min_max_scale(energy, min(energy), max(energy)),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    valence = min_max_scale(valence, min(valence), max(valence))
+  )
+
+range(model2_data$energy)
+range(model2_data$loudness)
+range(model2_data$valence)
+
+
+set.seed(1)
+model2_train_indices <- createDataPartition(randomForest_data$acousticness, p = 0.8, list = FALSE)
+model2_train_data <- model2_data[model2_train_indices, ]
+model2_test_data <- model2_data[-model2_train_indices, ]
+
+```
+
+```{r}
+model2 <- randomForest(energy ~ ., data = model2_train_data, ntree=500)
+summary(model2)
+
+model2_predictions <- predict(model2, newdata = model2_test_data)
+model2_mse <- mean((model2_test_data$energy - model2_predictions)^2)
+model2_mse
+model2_rmse <- sqrt(model2_mse)
+model2_rmse
+
+varImpPlot(model2)
+
+model2_residuals <- model2_test_data$energy - model2_predictions
+plot(model2_predictions, model2_residuals, xlab = "Predicted", ylab = "Residuals", main = "Residual Plot")
+
+```
+
+## Back to Classification
+
+### QDA: acousticness \~ loudness + energy + danceability
+
+```{r}
+hist(data$acousticness, col="green")
+range(data$acousticness)
+range(data$danceability)
+range(data$loudness)
+range(data$energy)
+
+QDA_data <- data[, c("acousticness", "loudness", "energy", "danceability")]
+
+mean_acousticness <- mean(QDA_data$acousticness)
+mean_acousticness
+median_acousticness <- median(QDA_data$acousticness)
+median_acousticness
+
+QDA_data <- QDA_data %>%
+  mutate(
+    acousticness = ifelse(acousticness >= mean_acousticness, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    energy = min_max_scale(energy, min(energy), max(energy)),
+    danceability = min_max_scale(danceability, min(danceability), max(danceability))
+  )
+
+range(QDA_data$acousticness)
+range(QDA_data$danceability)
+range(QDA_data$loudness)
+range(QDA_data$energy)
+
+table(QDA_data$acousticness)
+
+
+set.seed(1)
+QDA_train_indices <- createDataPartition(QDA_data$acousticness, p = 0.8, list = FALSE)
+QDA_train_data <- QDA_data[QDA_train_indices, ]
+QDA_test_data <- QDA_data[-QDA_train_indices, ]
+
+QDA_model <- qda(acousticness ~ ., data = QDA_train_data)
+summary(QDA_model)
+
+# Make predictions on the test data
+QDA_predictions <- predict(QDA_model, newdata = QDA_test_data, decision.values = TRUE)
+QDA_probabilities <- predict(QDA_model, newdata = QDA_test_data, type="probs")
+QDA_decision_values <- QDA_probabilities$posterior[,"1"]
+head(QDA_decision_values)
+
+QDA_roc <- roc(QDA_test_data$acousticness, QDA_decision_values)
+plot(QDA_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(QDA_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+QDA_accuracy <- mean(QDA_predictions$class == QDA_test_data$acousticness)
+
+# Print the accuracy
+cat("Accuracy:", QDA_accuracy, "\n")
+
+QDA_confusion_matrix <- caret::confusionMatrix(as.factor(QDA_predictions$class),
+                                                  as.factor(QDA_test_data$acousticness))
+QDA_ct <- QDA_confusion_matrix$table
+QDA_TP <- QDA_ct[2, 2] # true positive
+QDA_FP <- QDA_ct[2, 1] # false positive
+QDA_TN <- QDA_ct[1, 1] # true negative
+QDA_FN <- QDA_ct[1, 2] # false negative
+QDA_P <- QDA_TP + QDA_FN # all positives (1)
+QDA_N <- QDA_FP + QDA_TN # all negatives (0)
+
+ggplot(as.data.frame(QDA_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+
+```
+
+### QDA: median
+
+```{r}
+QDA_median_data <- data[, c("acousticness", "loudness", "energy", "danceability")]
+median_acousticness <- median(QDA_median_data$acousticness)
+median_acousticness
+
+
+QDA_median_data <- QDA_median_data %>%
+  mutate(
+    acousticness = ifelse(acousticness >= median_acousticness, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    energy = min_max_scale(energy, min(energy), max(energy)),
+    danceability = min_max_scale(danceability, min(danceability), max(danceability))
+  )
+
+
+table(QDA_median_data$acousticness)
+
+range(QDA_median_data$acousticness)
+range(QDA_median_data$danceability)
+range(QDA_median_data$loudness)
+range(QDA_median_data$energy)
+
+
+set.seed(1)
+QDA_median_train_indices <- createDataPartition(QDA_median_data$acousticness, p = 0.8, list = FALSE)
+QDA_median_train_data <- QDA_median_data[QDA_median_train_indices, ]
+QDA_median_test_data <- QDA_median_data[-QDA_median_train_indices, ]
+
+QDA_median_model <- qda(acousticness ~ ., data = QDA_median_train_data)
+summary(QDA_median_model)
+
+# Make predictions on the test data
+QDA_median_predictions <- predict(QDA_median_model, newdata = QDA_median_test_data, decision.values = TRUE)
+QDA_median_probabilities <- predict(QDA_median_model, newdata = QDA_median_test_data, type="probs")
+QDA_median_decision_values <- QDA_median_probabilities$posterior[,"1"]
+head(QDA_median_decision_values)
+
+QDA_median_roc <- roc(QDA_median_test_data$acousticness, QDA_median_decision_values)
+plot(QDA_median_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(QDA_median_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+QDA_median_accuracy <- mean(QDA_median_predictions$class == QDA_median_test_data$acousticness)
+
+# Print the accuracy
+cat("Accuracy:", QDA_median_accuracy, "\n")
+
+QDA_median_confusion_matrix <- caret::confusionMatrix(as.factor(QDA_median_predictions$class),
+                                                  as.factor(QDA_median_test_data$acousticness))
+QDA_median_ct <- QDA_median_confusion_matrix$table
+QDA_median_TP <- QDA_median_ct[2, 2] # true positive
+QDA_median_FP <- QDA_median_ct[2, 1] # false positive
+QDA_median_TN <- QDA_median_ct[1, 1] # true negative
+QDA_median_FN <- QDA_median_ct[1, 2] # false negative
+QDA_median_P <- QDA_median_TP + QDA_median_FN # all positives (1)
+QDA_median_N <- QDA_median_FP + QDA_median_TN # all negatives (0)
+
+ggplot(as.data.frame(QDA_median_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+### GBM
+
+```{r}
+hist(data$acousticness, col="green")
+range(data$acousticness)
+range(data$danceability)
+range(data$loudness)
+range(data$energy)
+
+GBM_data <- data[, c("acousticness", "loudness", "energy", "danceability")]
+
+mean_acousticness <- mean(GBM_data$acousticness)
+mean_acousticness
+median_acousticness <- median(GBM_data$acousticness)
+median_acousticness
+
+GBM_data <- GBM_data %>%
+  mutate(
+    acousticness = ifelse(acousticness >= mean_acousticness, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    energy = min_max_scale(energy, min(energy), max(energy)),
+    danceability = min_max_scale(danceability, min(danceability), max(danceability))
+  )
+
+range(GBM_data$acousticness)
+range(GBM_data$danceability)
+range(GBM_data$loudness)
+range(GBM_data$energy)
+
+
+set.seed(1)
+GBM_train_indices <- createDataPartition(GBM_data$acousticness, p = 0.8, list = FALSE)
+GBM_train_data <- GBM_data[GBM_train_indices, ]
+GBM_test_data <- GBM_data[-GBM_train_indices, ]
+
+GBM_model <- gbm(acousticness ~ ., data = GBM_train_data, distribution = "bernoulli", n.trees = 100, interaction.depth = 3)
+summary(GBM_model)
+
+# Make predictions on the test data
+GBM_prediction_probabilities <- predict(GBM_model, newdata = GBM_test_data, n.trees = 100, type = "response")
+head(GBM_prediction_probabilities)
+
+GBM_predictions <- ifelse(GBM_prediction_probabilities >= 0.713, 1, 0)
+
+
+
+GBM_roc <- roc(GBM_test_data$acousticness, GBM_prediction_probabilities)
+plot(GBM_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(GBM_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+GBM_accuracy <- mean(GBM_predictions == GBM_test_data$acousticness)
+
+# Print the accuracy
+cat("Accuracy:", GBM_accuracy, "\n")
+
+GBM_confusion_matrix <- caret::confusionMatrix(as.factor(GBM_predictions),
+                                               as.factor(GBM_test_data$acousticness))
+GBM_ct <- GBM_confusion_matrix$table
+GBM_TP <- GBM_ct[2, 2] # true positive
+GBM_FP <- GBM_ct[2, 1] # false positive
+GBM_TN <- GBM_ct[1, 1] # true negative
+GBM_FN <- GBM_ct[1, 2] # false negative
+GBM_P <- GBM_TP + GBM_FN # all positives (1)
+GBM_N <- GBM_FP + GBM_TN # all negatives (0)
+
+ggplot(as.data.frame(GBM_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+### Energy Classification QDA vs. GBM
+
+```{r}
+hist(data$energy, col="green")
+range(data$valence)
+
+QDA_data <- data[, c("energy", "loudness", "valence")]
+
+mean_energy <- mean(QDA_data$energy)
+mean_energy
+median_energy <- median(QDA_data$energy)
+median_energy
+
+QDA_data <- QDA_data %>%
+  mutate(
+    energy = ifelse(energy >= mean_energy, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    valence = min_max_scale(valence, min(valence), max(valence))
+  )
+
+range(QDA_data$energy)
+range(QDA_data$valence)
+range(QDA_data$loudness)
+
+
+table(QDA_data$energy)
+
+
+set.seed(1)
+QDA_train_indices <- createDataPartition(QDA_data$energy, p = 0.8, list = FALSE)
+QDA_train_data <- QDA_data[QDA_train_indices, ]
+QDA_test_data <- QDA_data[-QDA_train_indices, ]
+
+QDA_model <- qda(energy ~ ., data = QDA_train_data)
+summary(QDA_model)
+
+# Make predictions on the test data
+QDA_predictions <- predict(QDA_model, newdata = QDA_test_data, decision.values = TRUE)
+QDA_probabilities <- predict(QDA_model, newdata = QDA_test_data, type="probs")
+QDA_decision_values <- QDA_probabilities$posterior[,"1"]
+head(QDA_decision_values)
+
+QDA_roc <- roc(QDA_test_data$energy, QDA_decision_values)
+plot(QDA_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(QDA_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+QDA_accuracy <- mean(QDA_predictions$class == QDA_test_data$energy)
+
+
+# Print the accuracy
+cat("Accuracy:", QDA_accuracy, "\n")
+
+QDA_confusion_matrix <- caret::confusionMatrix(as.factor(QDA_predictions$class),
+                                               as.factor(QDA_test_data$energy))
+QDA_ct <- QDA_confusion_matrix$table
+QDA_TP <- QDA_ct[2, 2] # true positive
+QDA_FP <- QDA_ct[2, 1] # false positive
+QDA_TN <- QDA_ct[1, 1] # true negative
+QDA_FN <- QDA_ct[1, 2] # false negative
+QDA_P <- QDA_TP + QDA_FN # all positives (1)
+QDA_N <- QDA_FP + QDA_TN # all negatives (0)
+
+ggplot(as.data.frame(QDA_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+### Trying the median
+
+```{r}
+QDA_median_data <- data[, c("energy", "loudness", "valence")]
+median_energy <- median(QDA_median_data$energy)
+median_energy
+
+
+QDA_median_data <- QDA_median_data %>%
+  mutate(
+    energy = ifelse(energy >= median_energy, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    valence = min_max_scale(valence, min(valence), max(valence))
+  )
+
+
+
+range(QDA_median_data$energy)
+range(QDA_median_data$valence)
+range(QDA_median_data$loudness)
+range(QDA_median_data$energy)
+
+
+set.seed(1)
+QDA_median_train_indices <- createDataPartition(QDA_median_data$energy, p = 0.8, list = FALSE)
+QDA_median_train_data <- QDA_median_data[QDA_median_train_indices, ]
+QDA_median_test_data <- QDA_median_data[-QDA_median_train_indices, ]
+
+QDA_median_model <- qda(energy ~ ., data = QDA_median_train_data)
+summary(QDA_median_model)
+
+# Make predictions on the test data
+QDA_median_predictions <- predict(QDA_median_model, newdata = QDA_median_test_data, decision.values = TRUE)
+QDA_median_probabilities <- predict(QDA_median_model, newdata = QDA_median_test_data, type="probs")
+QDA_median_decision_values <- QDA_median_probabilities$posterior[,"1"]
+head(QDA_median_decision_values)
+
+QDA_median_roc <- roc(QDA_median_test_data$energy, QDA_median_decision_values)
+plot(QDA_median_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(QDA_median_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+QDA_median_accuracy <- mean(QDA_median_predictions$class == QDA_median_test_data$energy)
+
+# Print the accuracy
+cat("Accuracy:", QDA_median_accuracy, "\n")
+
+QDA_median_confusion_matrix <- caret::confusionMatrix(as.factor(QDA_median_predictions$class),
+                                                      as.factor(QDA_median_test_data$energy))
+QDA_median_ct <- QDA_median_confusion_matrix$table
+QDA_median_TP <- QDA_median_ct[2, 2] # true positive
+QDA_median_FP <- QDA_median_ct[2, 1] # false positive
+QDA_median_TN <- QDA_median_ct[1, 1] # true negative
+QDA_median_FN <- QDA_median_ct[1, 2] # false negative
+QDA_median_P <- QDA_median_TP + QDA_median_FN # all positives (1)
+QDA_median_N <- QDA_median_FP + QDA_median_TN # all negatives (0)
+
+ggplot(as.data.frame(QDA_median_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+### GMB
+
+```{r}
+hist(data$energy, col="green")
+range(data$energy)
+range(data$valence)
+range(data$loudness)
+range(data$energy)
+
+GBM_data <- data[, c("energy", "loudness", "valence")]
+
+mean_energy <- mean(GBM_data$energy)
+mean_energy
+median_energy <- median(GBM_data$energy)
+median_energy
+
+GBM_data <- GBM_data %>%
+  mutate(
+    energy = ifelse(energy >= median_energy, 1, 0),
+    loudness = min_max_scale(loudness, min(loudness), max(loudness)),
+    valence = min_max_scale(valence, min(valence), max(valence))
+  )
+
+range(GBM_data$energy)
+range(GBM_data$valence)
+range(GBM_data$loudness)
+range(GBM_data$energy)
+
+
+set.seed(1)
+GBM_train_indices <- createDataPartition(GBM_data$energy, p = 0.8, list = FALSE)
+GBM_train_data <- GBM_data[GBM_train_indices, ]
+GBM_test_data <- GBM_data[-GBM_train_indices, ]
+
+GBM_model <- gbm(energy ~ ., data = GBM_train_data, distribution = "bernoulli", n.trees = 100, interaction.depth = 3)
+summary(GBM_model)
+
+# Make predictions on the test data
+GBM_prediction_probabilities <- predict(GBM_model, newdata = GBM_test_data, n.trees = 100, type = "response")
+head(GBM_prediction_probabilities)
+
+
+GBM_roc <- roc(GBM_test_data$energy, GBM_prediction_probabilities)
+plot(GBM_roc, main = "ROC Curve for QDA Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(GBM_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+GBM_predictions <- ifelse(GBM_prediction_probabilities >= 0.8576, 1, 0)
+
+# Calculate accuracy or other classification metrics
+GBM_accuracy <- mean(GBM_predictions == GBM_test_data$energy)
+
+# Print the accuracy
+cat("Accuracy:", GBM_accuracy, "\n")
+
+GBM_confusion_matrix <- caret::confusionMatrix(as.factor(GBM_predictions),
+                                               as.factor(GBM_test_data$energy))
+GBM_ct <- GBM_confusion_matrix$table
+GBM_TP <- GBM_ct[2, 2] # true positive
+GBM_FP <- GBM_ct[2, 1] # false positive
+GBM_TN <- GBM_ct[1, 1] # true negative
+GBM_FN <- GBM_ct[1, 2] # false negative
+GBM_P <- GBM_TP + GBM_FN # all positives (1)
+GBM_N <- GBM_FP + GBM_TN # all negatives (0)
+
+ggplot(as.data.frame(GBM_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
+
+### Tuning Hyper parameters
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Define the parameter grid
+param_grid <- expand.grid(
+  n.trees = c(100, 200, 300),
+  interaction.depth = c(3, 4, 5),
+  shrinkage = c(0.01, 0.1, 0.3),
+  n.minobsinnode = c(10, 20, 30)
+)
+
+# Specify the control parameters for training
+ctrl <- trainControl(method = "cv", number = 5)
+
+# Perform hyperparameter tuning
+garbage <- capture.output(gbm_tuned <- train(
+  energy ~ ., 
+  data = GBM_train_data, 
+  method = "gbm", 
+  trControl = ctrl, 
+  tuneGrid = param_grid,
+))
+
+GBM_tuned_model <- gbm_tuned$finalModel
+View(GBM_tuned_model)
+```
+
+### Tuned GBM results
+
+We are really not sure about these results, but after optimizing the hyperparameters the GBM seems to have a 100% accuracy on the test set. The prediction probabilites are very nicely separated - either they are very close to 0.1 or very close to 0.9, creating a clear split in the predicted classes.
+
+The one caveat that could mean that something is actually wrong is that in the tuning phase we forgot to specify that the problem is classification and nor regression. It therefore treats the predicted variable as a continuous feature. But hey! it seems to work...
+
+```{r}
+GBM_tuned_prediction_probabilities <- predict(GBM_tuned_model, newdata = GBM_test_data, type = "response")
+head(GBM_tuned_prediction_probabilities)
+GBM_tuned_predictions <- ifelse(GBM_tuned_prediction_probabilities >= 0.8, 1, 0)
+
+
+GBM_tuned_roc <- roc(GBM_test_data$energy, GBM_tuned_prediction_probabilities)
+plot(GBM_tuned_roc, main = "ROC Curve for GBM Model", col = "green", lwd = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(GBM_tuned_roc), 5)), col = "green", lwd = 2, bty = "n")
+
+# Calculate accuracy or other classification metrics
+GBM_tuned_accuracy <- mean(GBM_tuned_predictions == GBM_test_data$energy)
+
+# Print the accuracy
+cat("Accuracy:", GBM_tuned_accuracy, "\n")
+
+GBM_tuned_confusion_matrix <- caret::confusionMatrix(as.factor(GBM_tuned_predictions),
+                                               as.factor(GBM_test_data$energy))
+GBM_tuned_ct <- GBM_tuned_confusion_matrix$table
+GBM_tuned_TP <- GBM_tuned_ct[2, 2] # true positive
+GBM_tuned_FP <- GBM_tuned_ct[2, 1] # false positive
+GBM_tuned_TN <- GBM_tuned_ct[1, 1] # true negative
+GBM_tuned_FN <- GBM_tuned_ct[1, 2] # false negative
+GBM_tuned_P <- GBM_tuned_TP + GBM_tuned_FN # all positives (1)
+GBM_tuned_N <- GBM_tuned_FP + GBM_tuned_TN # all negatives (0)
+
+ggplot(as.data.frame(GBM_tuned_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "green") +
+  labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
+```
 
 ## Summary
 
-! Importnat !
+Gradient Boosting Machine seems to be the best performing model when tuned. We are not sure of its results...
+
+The QDA models' performance seems to be too dependent on the way the data is distributed - mainly in the regression problems. This is probably because we don't have any hyperparameters to tune.
+
+Overall the median seems to be the best value to choose when creating a binary classification problem from a continuous numeric variable - it does make sense - the number of entries in the classes is equal.
