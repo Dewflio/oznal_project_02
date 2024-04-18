@@ -81,6 +81,7 @@ Classification classes will be more balanced.
 ```{r}
 mean_energy <- mean(data$energy)
 mean_energy
+print(paste("Difference between mean and median:", mean_energy-median(data$energy)))
 
 data1 <- data %>%
   mutate(energy = ifelse(energy >= mean_energy, 1, 0)) %>%
@@ -98,6 +99,7 @@ SVM preforms well in high-dimensional spaces, making it suitable for dataset wit
 Also it aims to find best decision boundary, that maximizes margin between classes (reduces overfitting).
 Performs well by focusing on the most informative features.
 It can also handle inbalanced datasets, but our classification solves this issue already.
+And our classification is binary, so linear kernel of SVM is suitable for our case. 
 
 ### Prepare data for SVM
 
@@ -167,7 +169,8 @@ Coefficients represents weight of each feature to predict true positive/negative
 - positive coef. → higher chance of class 1
 - negative coef. → opposite
 
-Positive coeficients supports our **Hypothessis 1**.
+Higher coeficient of *loudness* feature supports our **Hypothessis 1**, which has high impact on evaluation that song is more energetic.
+But *valence* also take a little role there.
 
 **So we are not rejecting hypothesis, that louder and hapier songs are more energetic.**
 
@@ -183,6 +186,10 @@ abline((-coefs[1] + 1) / coefs[2], -coefs[3] / coefs[2], lty = 2, col = "green")
 
 If the decision boundary is nearly horizontal/vertical, it indicates high correlation among the data in the formula, supporting our initial assumption from correlation analysis.
 
+Margin (dashed line) is defined as distance between decision boundary and the closest support vector(s).
+SVM aims to maximize this margin during training.
+Larger margin indicates better separation between classes and typically leads to better generalization performance.
+
 ### Test SVM model
 
 Decision values are signed distance of each data point to the decision boundary. 
@@ -197,9 +204,9 @@ head(decision_values)
 
 #### ROC curve
 
-ROC curve is graphical representation of performance of binasry classifier. 
+ROC curve is graphical representation of performance of binary classifier. 
 
-```{r}
+```{r message=FALSE}
 roc <- roc(test_data$energy, decision_values)
 plot(roc, main = "ROC Curve for SVM Model", col = "green", lwd = 2)
 legend("bottomright", legend = paste("AUC =", round(auc(roc), 5)), col = "green", lwd = 2, bty = "n")
@@ -265,7 +272,6 @@ print(paste("F1 score: ", f1_score))
 ```{r}
 print(paste("Specificity: ", TN / (TN + FP)))
 ```
-
 
 ## LEO model - ?
 
