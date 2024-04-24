@@ -203,6 +203,9 @@ ggplot(as.data.frame(GBM_ct), aes(x = Reference, y = Prediction, fill = Freq)) +
   scale_fill_gradient(low = "white", high = "green") +
   labs(x = "Actual", y = "Predicted", title = "Confusion Matrix Heatmap")
 
+GBM_train_data$energy <- factor(GBM_train_data$energy)
+class(GBM_train_data$energy)
+head(GBM_train_data$energy)
 
 # Define the parameter grid
 param_grid <- expand.grid(
@@ -230,7 +233,7 @@ str(GBM_tuned_model)
 
 GBM_tuned_prediction_probabilities <- predict(GBM_tuned_model, newdata = GBM_test_data, type = "response")
 head(GBM_tuned_prediction_probabilities)
-GBM_tuned_predictions <- ifelse(GBM_tuned_prediction_probabilities >= 0.8, 1, 0)
+GBM_tuned_predictions <- ifelse(GBM_tuned_prediction_probabilities >= 0.5, 1, 0)
 
 
 GBM_tuned_roc <- roc(GBM_test_data$energy, GBM_tuned_prediction_probabilities)
@@ -239,6 +242,8 @@ legend("bottomright", legend = paste("AUC =", round(auc(GBM_tuned_roc), 5)), col
 
 # Calculate accuracy or other classification metrics
 GBM_tuned_accuracy <- mean(GBM_tuned_predictions == GBM_test_data$energy)
+head(GBM_test_data$energy)
+head(GBM_tuned_predictions)
 
 # Print the accuracy
 cat("Accuracy:", GBM_tuned_accuracy, "\n")
